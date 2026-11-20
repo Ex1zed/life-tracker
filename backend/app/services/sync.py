@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.models import DailyCheckin
 from app.schemas.sync import CheckinIn
 
+PULL_LIMIT = 500
+
 
 @dataclass
 class PushResult:
@@ -14,11 +16,25 @@ class PushResult:
     skipped: int = 0
 
 
+@dataclass
+class PullResult:
+    checkins: list[DailyCheckin]
+    cursor: datetime | None  # naive UTC, as stored in the database
+    has_more: bool
+
+
 def to_db_time(value: datetime | None) -> datetime | None:
     """Timezone-aware time from the API -> naive UTC, as we store it in MySQL."""
     if value is None:
         return None
     return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def from_db_time(value: datetime | None) -> datetime | None:
+    """Naive UTC from the database -> timezone-aware time for the API."""
+    if value is None:
+        return None
+    return value.replace(tzinfo=UTC)
 
 
 def push_checkins(db: Session, user_id: str, items: list[CheckinIn]) -> PushResult:
@@ -72,3 +88,26 @@ def push_checkins(db: Session, user_id: str, items: list[CheckinIn]) -> PushResu
 
     db.commit()
     return result
+
+
+def pull_checkins(
+    db: Session,
+    user_id: str,
+    since: datetime | None,
+    limit: int | None = None,
+) -> PullResult:
+    """Check-ins written on the server after `since`, oldest first, one page at a time."""
+    limit = limit or PULL_LIMIT
+
+    query = select(DailyCheckin).where(DailyCheckin.user_id == user_id)
+    if since is not None:
+        query = query.where(DailyCheckin.server_updated_at > to_db_time(since))
+    # Ask for one extra row: if it exists, there is another page.
+    rows = db.scalars(
+        query.order_by(DailyCheckin.server_updated_at).limit(limit + 1)
+    ).all()
+
+    has_more = len(rows) > limit
+    rows = list(rows[:limit])
+    cursor = rows[-1].server_updated_at if rows else to_db_time(since)
+    return PullResult(checkins=rows, cursor=cursor, has_more=has_more)
