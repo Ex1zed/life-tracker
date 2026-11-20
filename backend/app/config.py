@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     mysql_database: str
     mysql_user: str
     mysql_password: str
+    # Signs JWT and hashes login codes. Never commit the real value.
+    secret_key: str
 
     @property
     def database_url(self) -> URL:
