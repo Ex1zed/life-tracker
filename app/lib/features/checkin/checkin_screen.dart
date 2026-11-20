@@ -1,11 +1,13 @@
-import 'package:material_ui/material_ui.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../core/dates.dart';
 import '../../data/local/app_database.dart';
 import '../../data/providers.dart';
-import 'checkin_providers.dart';
 import '../auth/auth_controller.dart';
+import 'checkin_providers.dart';
 
 class CheckinScreen extends ConsumerStatefulWidget {
   const CheckinScreen({super.key});
@@ -59,6 +61,8 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
             productivity: _productivity,
             note: _noteController.text,
           );
+      // Saved locally; send it to the server in the background.
+      unawaited(ref.read(syncServiceProvider).syncNow());
       if (!mounted) return;
       setState(() => _hasToday = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,12 +77,37 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
   Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await _ask(
+      title: 'Выйти из аккаунта?',
+      text: 'Записи отправятся на сервер и удалятся с этого устройства.',
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Upload everything first: sign-out wipes the local database.
+    await ref.read(syncServiceProvider).syncNow();
+    final unsent = await ref.read(checkinRepositoryProvider).pendingSync();
+    if (!mounted) return;
+
+    if (unsent.isNotEmpty) {
+      final force = await _ask(
+        title: 'Не всё отправлено',
+        text: 'Нет связи с сервером. Неотправленные записи '
+            '(${unsent.length}) будут потеряны. Выйти всё равно?',
+      );
+      if (force != true || !mounted) return;
+    }
+
+    await ref.read(authControllerProvider.notifier).signOut();
+  }
+
+  Future<bool?> _ask({required String title, required String text}) {
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Выйти из аккаунта?'),
-        content: const Text('Записи на этом устройстве будут удалены.'),
+        title: Text(title),
+        content: Text(text),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -91,10 +120,8 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
         ],
       ),
     );
-    if (confirmed == true) {
-      await ref.read(authControllerProvider.notifier).signOut();
-    }
   }
+
   @override
   void dispose() {
     _noteController.dispose();
@@ -107,7 +134,7 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-       appBar: AppBar(
+      appBar: AppBar(
         title: const Text('Сегодня'),
         actions: [
           IconButton(

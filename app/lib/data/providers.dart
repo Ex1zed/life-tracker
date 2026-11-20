@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
 import 'local/app_database.dart';
+import 'remote/sync_api.dart';
 import 'remote/token_storage.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/checkin_repository.dart';
+import 'sync/sync_service.dart';
 
 /// One database instance for the whole app, closed when the app shuts down.
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -50,5 +52,18 @@ final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(
     ref.watch(dioProvider),
     ref.watch(tokenStorageProvider),
+  ),
+);
+
+final syncApiProvider = Provider<SyncApi>(
+  (ref) => SyncApi(ref.watch(dioProvider)),
+);
+
+/// A single SyncService for the app, so "one sync at a time" works.
+final syncServiceProvider = Provider<SyncService>(
+  (ref) => SyncService(
+    api: ref.watch(syncApiProvider),
+    checkins: ref.watch(checkinRepositoryProvider),
+    db: ref.watch(appDatabaseProvider),
   ),
 );

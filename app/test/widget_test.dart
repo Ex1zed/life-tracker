@@ -4,8 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:life_tracker/data/local/app_database.dart';
 import 'package:life_tracker/data/providers.dart';
 import 'package:life_tracker/data/remote/token_storage.dart';
+import 'package:life_tracker/data/sync/sync_service.dart';
 import 'package:life_tracker/features/checkin/checkin_providers.dart';
 import 'package:life_tracker/main.dart';
+
+/// Sync that does nothing: widget tests have no server.
+class _NoSync implements SyncService {
+  @override
+  Future<bool> syncNow() async => true;
+}
 
 void main() {
   late AppDatabase db;
@@ -20,6 +27,7 @@ void main() {
           tokenStorageProvider.overrideWithValue(
             InMemoryTokenStorage()..token = token,
           ),
+          syncServiceProvider.overrideWithValue(_NoSync()),
           recentCheckinsProvider.overrideWith(
             (ref) => Stream.value(const <DailyCheckin>[]),
           ),

@@ -31,6 +31,19 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
+  /// Reads a sync bookkeeping value, e.g. the pull cursor.
+  Future<String?> readSyncValue(String name) async {
+    final row = await (select(syncState)..where((t) => t.name.equals(name)))
+        .getSingleOrNull();
+    return row?.value;
+  }
+
+  /// Saves a sync bookkeeping value, replacing the old one.
+  Future<void> writeSyncValue(String name, String value) =>
+      into(syncState).insertOnConflictUpdate(
+        SyncStateCompanion.insert(name: name, value: value),
+      );
+
   /// Deletes every row in every table, e.g. when the user signs out.
   Future<void> clearAllData() => transaction(() async {
         for (final table in allTables) {
