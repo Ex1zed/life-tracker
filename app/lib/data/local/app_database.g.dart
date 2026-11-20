@@ -51,6 +51,21 @@ class $SleepEntriesTable extends SleepEntries
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _needsSyncMeta = const VerificationMeta(
+    'needsSync',
+  );
+  @override
+  late final GeneratedColumn<bool> needsSync = GeneratedColumn<bool>(
+    'needs_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_sync" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _sleepStartMeta = const VerificationMeta(
     'sleepStart',
   );
@@ -109,6 +124,7 @@ class $SleepEntriesTable extends SleepEntries
     createdAt,
     updatedAt,
     deletedAt,
+    needsSync,
     sleepStart,
     sleepEnd,
     source,
@@ -152,6 +168,12 @@ class $SleepEntriesTable extends SleepEntries
       context.handle(
         _deletedAtMeta,
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_sync')) {
+      context.handle(
+        _needsSyncMeta,
+        needsSync.isAcceptableOrUnknown(data['needs_sync']!, _needsSyncMeta),
       );
     }
     if (data.containsKey('sleep_start')) {
@@ -207,6 +229,10 @@ class $SleepEntriesTable extends SleepEntries
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      needsSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_sync'],
+      )!,
       sleepStart: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}sleep_start'],
@@ -251,6 +277,10 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
 
   /// Soft delete: deletions are synced like any other change.
   final DateTime? deletedAt;
+
+  /// True while the row has local changes the server hasn't accepted yet.
+  /// Defaults to true, so rows that existed before sync get uploaded.
+  final bool needsSync;
   final DateTime sleepStart;
   final DateTime sleepEnd;
 
@@ -265,6 +295,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    required this.needsSync,
     required this.sleepStart,
     required this.sleepEnd,
     required this.source,
@@ -280,6 +311,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    map['needs_sync'] = Variable<bool>(needsSync);
     map['sleep_start'] = Variable<DateTime>(sleepStart);
     map['sleep_end'] = Variable<DateTime>(sleepEnd);
     {
@@ -304,6 +336,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      needsSync: Value(needsSync),
       sleepStart: Value(sleepStart),
       sleepEnd: Value(sleepEnd),
       source: Value(source),
@@ -324,6 +357,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      needsSync: serializer.fromJson<bool>(json['needsSync']),
       sleepStart: serializer.fromJson<DateTime>(json['sleepStart']),
       sleepEnd: serializer.fromJson<DateTime>(json['sleepEnd']),
       source: $SleepEntriesTable.$convertersource.fromJson(
@@ -341,6 +375,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'needsSync': serializer.toJson<bool>(needsSync),
       'sleepStart': serializer.toJson<DateTime>(sleepStart),
       'sleepEnd': serializer.toJson<DateTime>(sleepEnd),
       'source': serializer.toJson<String>(
@@ -356,6 +391,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
+    bool? needsSync,
     DateTime? sleepStart,
     DateTime? sleepEnd,
     SleepSource? source,
@@ -366,6 +402,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    needsSync: needsSync ?? this.needsSync,
     sleepStart: sleepStart ?? this.sleepStart,
     sleepEnd: sleepEnd ?? this.sleepEnd,
     source: source ?? this.source,
@@ -378,6 +415,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      needsSync: data.needsSync.present ? data.needsSync.value : this.needsSync,
       sleepStart: data.sleepStart.present
           ? data.sleepStart.value
           : this.sleepStart,
@@ -395,6 +433,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('needsSync: $needsSync, ')
           ..write('sleepStart: $sleepStart, ')
           ..write('sleepEnd: $sleepEnd, ')
           ..write('source: $source, ')
@@ -410,6 +449,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
     createdAt,
     updatedAt,
     deletedAt,
+    needsSync,
     sleepStart,
     sleepEnd,
     source,
@@ -424,6 +464,7 @@ class SleepEntry extends DataClass implements Insertable<SleepEntry> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
+          other.needsSync == this.needsSync &&
           other.sleepStart == this.sleepStart &&
           other.sleepEnd == this.sleepEnd &&
           other.source == this.source &&
@@ -436,6 +477,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
+  final Value<bool> needsSync;
   final Value<DateTime> sleepStart;
   final Value<DateTime> sleepEnd;
   final Value<SleepSource> source;
@@ -447,6 +489,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.needsSync = const Value.absent(),
     this.sleepStart = const Value.absent(),
     this.sleepEnd = const Value.absent(),
     this.source = const Value.absent(),
@@ -459,6 +502,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
+    this.needsSync = const Value.absent(),
     required DateTime sleepStart,
     required DateTime sleepEnd,
     required SleepSource source,
@@ -476,6 +520,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
+    Expression<bool>? needsSync,
     Expression<DateTime>? sleepStart,
     Expression<DateTime>? sleepEnd,
     Expression<String>? source,
@@ -488,6 +533,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (needsSync != null) 'needs_sync': needsSync,
       if (sleepStart != null) 'sleep_start': sleepStart,
       if (sleepEnd != null) 'sleep_end': sleepEnd,
       if (source != null) 'source': source,
@@ -502,6 +548,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
+    Value<bool>? needsSync,
     Value<DateTime>? sleepStart,
     Value<DateTime>? sleepEnd,
     Value<SleepSource>? source,
@@ -514,6 +561,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      needsSync: needsSync ?? this.needsSync,
       sleepStart: sleepStart ?? this.sleepStart,
       sleepEnd: sleepEnd ?? this.sleepEnd,
       source: source ?? this.source,
@@ -537,6 +585,9 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
     }
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (needsSync.present) {
+      map['needs_sync'] = Variable<bool>(needsSync.value);
     }
     if (sleepStart.present) {
       map['sleep_start'] = Variable<DateTime>(sleepStart.value);
@@ -568,6 +619,7 @@ class SleepEntriesCompanion extends UpdateCompanion<SleepEntry> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('needsSync: $needsSync, ')
           ..write('sleepStart: $sleepStart, ')
           ..write('sleepEnd: $sleepEnd, ')
           ..write('source: $source, ')
@@ -627,6 +679,21 @@ class $DailyCheckinsTable extends DailyCheckins
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _needsSyncMeta = const VerificationMeta(
+    'needsSync',
+  );
+  @override
+  late final GeneratedColumn<bool> needsSync = GeneratedColumn<bool>(
+    'needs_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_sync" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _dateMeta = const VerificationMeta('date');
   @override
   late final GeneratedColumn<String> date = GeneratedColumn<String>(
@@ -684,6 +751,7 @@ class $DailyCheckinsTable extends DailyCheckins
     createdAt,
     updatedAt,
     deletedAt,
+    needsSync,
     date,
     mood,
     energy,
@@ -727,6 +795,12 @@ class $DailyCheckinsTable extends DailyCheckins
       context.handle(
         _deletedAtMeta,
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_sync')) {
+      context.handle(
+        _needsSyncMeta,
+        needsSync.isAcceptableOrUnknown(data['needs_sync']!, _needsSyncMeta),
       );
     }
     if (data.containsKey('date')) {
@@ -795,6 +869,10 @@ class $DailyCheckinsTable extends DailyCheckins
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      needsSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_sync'],
+      )!,
       date: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}date'],
@@ -835,6 +913,10 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
   /// Soft delete: deletions are synced like any other change.
   final DateTime? deletedAt;
 
+  /// True while the row has local changes the server hasn't accepted yet.
+  /// Defaults to true, so rows that existed before sync get uploaded.
+  final bool needsSync;
+
   /// Local calendar date as "YYYY-MM-DD": exact, sortable, matches the API.
   final String date;
   final int mood;
@@ -846,6 +928,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    required this.needsSync,
     required this.date,
     required this.mood,
     required this.energy,
@@ -861,6 +944,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    map['needs_sync'] = Variable<bool>(needsSync);
     map['date'] = Variable<String>(date);
     map['mood'] = Variable<int>(mood);
     map['energy'] = Variable<int>(energy);
@@ -879,6 +963,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      needsSync: Value(needsSync),
       date: Value(date),
       mood: Value(mood),
       energy: Value(energy),
@@ -897,6 +982,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      needsSync: serializer.fromJson<bool>(json['needsSync']),
       date: serializer.fromJson<String>(json['date']),
       mood: serializer.fromJson<int>(json['mood']),
       energy: serializer.fromJson<int>(json['energy']),
@@ -912,6 +998,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'needsSync': serializer.toJson<bool>(needsSync),
       'date': serializer.toJson<String>(date),
       'mood': serializer.toJson<int>(mood),
       'energy': serializer.toJson<int>(energy),
@@ -925,6 +1012,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
+    bool? needsSync,
     String? date,
     int? mood,
     int? energy,
@@ -935,6 +1023,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    needsSync: needsSync ?? this.needsSync,
     date: date ?? this.date,
     mood: mood ?? this.mood,
     energy: energy ?? this.energy,
@@ -947,6 +1036,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      needsSync: data.needsSync.present ? data.needsSync.value : this.needsSync,
       date: data.date.present ? data.date.value : this.date,
       mood: data.mood.present ? data.mood.value : this.mood,
       energy: data.energy.present ? data.energy.value : this.energy,
@@ -964,6 +1054,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('needsSync: $needsSync, ')
           ..write('date: $date, ')
           ..write('mood: $mood, ')
           ..write('energy: $energy, ')
@@ -979,6 +1070,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
     createdAt,
     updatedAt,
     deletedAt,
+    needsSync,
     date,
     mood,
     energy,
@@ -993,6 +1085,7 @@ class DailyCheckin extends DataClass implements Insertable<DailyCheckin> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
+          other.needsSync == this.needsSync &&
           other.date == this.date &&
           other.mood == this.mood &&
           other.energy == this.energy &&
@@ -1005,6 +1098,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
+  final Value<bool> needsSync;
   final Value<String> date;
   final Value<int> mood;
   final Value<int> energy;
@@ -1016,6 +1110,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.needsSync = const Value.absent(),
     this.date = const Value.absent(),
     this.mood = const Value.absent(),
     this.energy = const Value.absent(),
@@ -1028,6 +1123,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
+    this.needsSync = const Value.absent(),
     required String date,
     required int mood,
     required int energy,
@@ -1046,6 +1142,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
+    Expression<bool>? needsSync,
     Expression<String>? date,
     Expression<int>? mood,
     Expression<int>? energy,
@@ -1058,6 +1155,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (needsSync != null) 'needs_sync': needsSync,
       if (date != null) 'date': date,
       if (mood != null) 'mood': mood,
       if (energy != null) 'energy': energy,
@@ -1072,6 +1170,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
+    Value<bool>? needsSync,
     Value<String>? date,
     Value<int>? mood,
     Value<int>? energy,
@@ -1084,6 +1183,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      needsSync: needsSync ?? this.needsSync,
       date: date ?? this.date,
       mood: mood ?? this.mood,
       energy: energy ?? this.energy,
@@ -1107,6 +1207,9 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
     }
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (needsSync.present) {
+      map['needs_sync'] = Variable<bool>(needsSync.value);
     }
     if (date.present) {
       map['date'] = Variable<String>(date.value);
@@ -1136,6 +1239,7 @@ class DailyCheckinsCompanion extends UpdateCompanion<DailyCheckin> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('needsSync: $needsSync, ')
           ..write('date: $date, ')
           ..write('mood: $mood, ')
           ..write('energy: $energy, ')
@@ -1194,6 +1298,21 @@ class $SettingsTable extends Settings
     true,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+  );
+  static const VerificationMeta _needsSyncMeta = const VerificationMeta(
+    'needsSync',
+  );
+  @override
+  late final GeneratedColumn<bool> needsSync = GeneratedColumn<bool>(
+    'needs_sync',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("needs_sync" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
   );
   static const VerificationMeta _timezoneMeta = const VerificationMeta(
     'timezone',
@@ -1288,6 +1407,7 @@ class $SettingsTable extends Settings
     createdAt,
     updatedAt,
     deletedAt,
+    needsSync,
     timezone,
     sleepGoalMinutes,
     bedtime,
@@ -1333,6 +1453,12 @@ class $SettingsTable extends Settings
       context.handle(
         _deletedAtMeta,
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('needs_sync')) {
+      context.handle(
+        _needsSyncMeta,
+        needsSync.isAcceptableOrUnknown(data['needs_sync']!, _needsSyncMeta),
       );
     }
     if (data.containsKey('timezone')) {
@@ -1417,6 +1543,10 @@ class $SettingsTable extends Settings
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      needsSync: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}needs_sync'],
+      )!,
       timezone: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}timezone'],
@@ -1464,6 +1594,10 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
 
   /// Soft delete: deletions are synced like any other change.
   final DateTime? deletedAt;
+
+  /// True while the row has local changes the server hasn't accepted yet.
+  /// Defaults to true, so rows that existed before sync get uploaded.
+  final bool needsSync;
   final String timezone;
   final int sleepGoalMinutes;
   final int bedtime;
@@ -1478,6 +1612,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
+    required this.needsSync,
     required this.timezone,
     required this.sleepGoalMinutes,
     required this.bedtime,
@@ -1495,6 +1630,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    map['needs_sync'] = Variable<bool>(needsSync);
     map['timezone'] = Variable<String>(timezone);
     map['sleep_goal_minutes'] = Variable<int>(sleepGoalMinutes);
     map['bedtime'] = Variable<int>(bedtime);
@@ -1517,6 +1653,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      needsSync: Value(needsSync),
       timezone: Value(timezone),
       sleepGoalMinutes: Value(sleepGoalMinutes),
       bedtime: Value(bedtime),
@@ -1541,6 +1678,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      needsSync: serializer.fromJson<bool>(json['needsSync']),
       timezone: serializer.fromJson<String>(json['timezone']),
       sleepGoalMinutes: serializer.fromJson<int>(json['sleepGoalMinutes']),
       bedtime: serializer.fromJson<int>(json['bedtime']),
@@ -1558,6 +1696,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'needsSync': serializer.toJson<bool>(needsSync),
       'timezone': serializer.toJson<String>(timezone),
       'sleepGoalMinutes': serializer.toJson<int>(sleepGoalMinutes),
       'bedtime': serializer.toJson<int>(bedtime),
@@ -1573,6 +1712,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
+    bool? needsSync,
     String? timezone,
     int? sleepGoalMinutes,
     int? bedtime,
@@ -1585,6 +1725,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    needsSync: needsSync ?? this.needsSync,
     timezone: timezone ?? this.timezone,
     sleepGoalMinutes: sleepGoalMinutes ?? this.sleepGoalMinutes,
     bedtime: bedtime ?? this.bedtime,
@@ -1603,6 +1744,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      needsSync: data.needsSync.present ? data.needsSync.value : this.needsSync,
       timezone: data.timezone.present ? data.timezone.value : this.timezone,
       sleepGoalMinutes: data.sleepGoalMinutes.present
           ? data.sleepGoalMinutes.value
@@ -1630,6 +1772,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('needsSync: $needsSync, ')
           ..write('timezone: $timezone, ')
           ..write('sleepGoalMinutes: $sleepGoalMinutes, ')
           ..write('bedtime: $bedtime, ')
@@ -1647,6 +1790,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
     createdAt,
     updatedAt,
     deletedAt,
+    needsSync,
     timezone,
     sleepGoalMinutes,
     bedtime,
@@ -1663,6 +1807,7 @@ class UserSettings extends DataClass implements Insertable<UserSettings> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
+          other.needsSync == this.needsSync &&
           other.timezone == this.timezone &&
           other.sleepGoalMinutes == this.sleepGoalMinutes &&
           other.bedtime == this.bedtime &&
@@ -1677,6 +1822,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
+  final Value<bool> needsSync;
   final Value<String> timezone;
   final Value<int> sleepGoalMinutes;
   final Value<int> bedtime;
@@ -1690,6 +1836,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.needsSync = const Value.absent(),
     this.timezone = const Value.absent(),
     this.sleepGoalMinutes = const Value.absent(),
     this.bedtime = const Value.absent(),
@@ -1704,6 +1851,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
+    this.needsSync = const Value.absent(),
     this.timezone = const Value.absent(),
     this.sleepGoalMinutes = const Value.absent(),
     this.bedtime = const Value.absent(),
@@ -1720,6 +1868,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
+    Expression<bool>? needsSync,
     Expression<String>? timezone,
     Expression<int>? sleepGoalMinutes,
     Expression<int>? bedtime,
@@ -1734,6 +1883,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (needsSync != null) 'needs_sync': needsSync,
       if (timezone != null) 'timezone': timezone,
       if (sleepGoalMinutes != null) 'sleep_goal_minutes': sleepGoalMinutes,
       if (bedtime != null) 'bedtime': bedtime,
@@ -1750,6 +1900,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
+    Value<bool>? needsSync,
     Value<String>? timezone,
     Value<int>? sleepGoalMinutes,
     Value<int>? bedtime,
@@ -1764,6 +1915,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      needsSync: needsSync ?? this.needsSync,
       timezone: timezone ?? this.timezone,
       sleepGoalMinutes: sleepGoalMinutes ?? this.sleepGoalMinutes,
       bedtime: bedtime ?? this.bedtime,
@@ -1789,6 +1941,9 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
     }
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (needsSync.present) {
+      map['needs_sync'] = Variable<bool>(needsSync.value);
     }
     if (timezone.present) {
       map['timezone'] = Variable<String>(timezone.value);
@@ -1824,6 +1979,7 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('needsSync: $needsSync, ')
           ..write('timezone: $timezone, ')
           ..write('sleepGoalMinutes: $sleepGoalMinutes, ')
           ..write('bedtime: $bedtime, ')
@@ -1837,12 +1993,221 @@ class SettingsCompanion extends UpdateCompanion<UserSettings> {
   }
 }
 
+class $SyncStateTable extends SyncState
+    with TableInfo<$SyncStateTable, SyncStateData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [name, value];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_state';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncStateData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {name};
+  @override
+  SyncStateData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncStateData(
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncStateTable createAlias(String alias) {
+    return $SyncStateTable(attachedDatabase, alias);
+  }
+}
+
+class SyncStateData extends DataClass implements Insertable<SyncStateData> {
+  final String name;
+  final String value;
+  const SyncStateData({required this.name, required this.value});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['name'] = Variable<String>(name);
+    map['value'] = Variable<String>(value);
+    return map;
+  }
+
+  SyncStateCompanion toCompanion(bool nullToAbsent) {
+    return SyncStateCompanion(name: Value(name), value: Value(value));
+  }
+
+  factory SyncStateData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncStateData(
+      name: serializer.fromJson<String>(json['name']),
+      value: serializer.fromJson<String>(json['value']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'name': serializer.toJson<String>(name),
+      'value': serializer.toJson<String>(value),
+    };
+  }
+
+  SyncStateData copyWith({String? name, String? value}) =>
+      SyncStateData(name: name ?? this.name, value: value ?? this.value);
+  SyncStateData copyWithCompanion(SyncStateCompanion data) {
+    return SyncStateData(
+      name: data.name.present ? data.name.value : this.name,
+      value: data.value.present ? data.value.value : this.value,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateData(')
+          ..write('name: $name, ')
+          ..write('value: $value')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(name, value);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncStateData &&
+          other.name == this.name &&
+          other.value == this.value);
+}
+
+class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
+  final Value<String> name;
+  final Value<String> value;
+  final Value<int> rowid;
+  const SyncStateCompanion({
+    this.name = const Value.absent(),
+    this.value = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncStateCompanion.insert({
+    required String name,
+    required String value,
+    this.rowid = const Value.absent(),
+  }) : name = Value(name),
+       value = Value(value);
+  static Insertable<SyncStateData> custom({
+    Expression<String>? name,
+    Expression<String>? value,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (name != null) 'name': name,
+      if (value != null) 'value': value,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncStateCompanion copyWith({
+    Value<String>? name,
+    Value<String>? value,
+    Value<int>? rowid,
+  }) {
+    return SyncStateCompanion(
+      name: name ?? this.name,
+      value: value ?? this.value,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateCompanion(')
+          ..write('name: $name, ')
+          ..write('value: $value, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $SleepEntriesTable sleepEntries = $SleepEntriesTable(this);
   late final $DailyCheckinsTable dailyCheckins = $DailyCheckinsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
+  late final $SyncStateTable syncState = $SyncStateTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1851,6 +2216,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     sleepEntries,
     dailyCheckins,
     settings,
+    syncState,
   ];
   @override
   DriftDatabaseOptions get options =>
@@ -1863,6 +2229,7 @@ typedef $$SleepEntriesTableCreateCompanionBuilder =
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
+      Value<bool> needsSync,
       required DateTime sleepStart,
       required DateTime sleepEnd,
       required SleepSource source,
@@ -1876,6 +2243,7 @@ typedef $$SleepEntriesTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<bool> needsSync,
       Value<DateTime> sleepStart,
       Value<DateTime> sleepEnd,
       Value<SleepSource> source,
@@ -1910,6 +2278,11 @@ class $$SleepEntriesTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1969,6 +2342,11 @@ class $$SleepEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get sleepStart => $composableBuilder(
     column: $table.sleepStart,
     builder: (column) => ColumnOrderings(column),
@@ -2015,6 +2393,9 @@ class $$SleepEntriesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsSync =>
+      $composableBuilder(column: $table.needsSync, builder: (column) => column);
 
   GeneratedColumn<DateTime> get sleepStart => $composableBuilder(
     column: $table.sleepStart,
@@ -2069,6 +2450,7 @@ class $$SleepEntriesTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
                 Value<DateTime> sleepStart = const Value.absent(),
                 Value<DateTime> sleepEnd = const Value.absent(),
                 Value<SleepSource> source = const Value.absent(),
@@ -2080,6 +2462,7 @@ class $$SleepEntriesTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                needsSync: needsSync,
                 sleepStart: sleepStart,
                 sleepEnd: sleepEnd,
                 source: source,
@@ -2093,6 +2476,7 @@ class $$SleepEntriesTableTableManager
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
                 required DateTime sleepStart,
                 required DateTime sleepEnd,
                 required SleepSource source,
@@ -2104,6 +2488,7 @@ class $$SleepEntriesTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                needsSync: needsSync,
                 sleepStart: sleepStart,
                 sleepEnd: sleepEnd,
                 source: source,
@@ -2151,6 +2536,7 @@ typedef $$DailyCheckinsTableCreateCompanionBuilder =
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
+      Value<bool> needsSync,
       required String date,
       required int mood,
       required int energy,
@@ -2164,6 +2550,7 @@ typedef $$DailyCheckinsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<bool> needsSync,
       Value<String> date,
       Value<int> mood,
       Value<int> energy,
@@ -2198,6 +2585,11 @@ class $$DailyCheckinsTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2256,6 +2648,11 @@ class $$DailyCheckinsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get date => $composableBuilder(
     column: $table.date,
     builder: (column) => ColumnOrderings(column),
@@ -2302,6 +2699,9 @@ class $$DailyCheckinsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsSync =>
+      $composableBuilder(column: $table.needsSync, builder: (column) => column);
 
   GeneratedColumn<String> get date =>
       $composableBuilder(column: $table.date, builder: (column) => column);
@@ -2356,6 +2756,7 @@ class $$DailyCheckinsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
                 Value<String> date = const Value.absent(),
                 Value<int> mood = const Value.absent(),
                 Value<int> energy = const Value.absent(),
@@ -2367,6 +2768,7 @@ class $$DailyCheckinsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                needsSync: needsSync,
                 date: date,
                 mood: mood,
                 energy: energy,
@@ -2380,6 +2782,7 @@ class $$DailyCheckinsTableTableManager
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
                 required String date,
                 required int mood,
                 required int energy,
@@ -2391,6 +2794,7 @@ class $$DailyCheckinsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                needsSync: needsSync,
                 date: date,
                 mood: mood,
                 energy: energy,
@@ -2437,6 +2841,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<DateTime?> deletedAt,
+  Value<bool> needsSync,
   Value<String> timezone,
   Value<int> sleepGoalMinutes,
   Value<int> bedtime,
@@ -2451,6 +2856,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<DateTime?> deletedAt,
+  Value<bool> needsSync,
   Value<String> timezone,
   Value<int> sleepGoalMinutes,
   Value<int> bedtime,
@@ -2487,6 +2893,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2555,6 +2966,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get needsSync => $composableBuilder(
+    column: $table.needsSync,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get timezone => $composableBuilder(
     column: $table.timezone,
     builder: (column) => ColumnOrderings(column),
@@ -2611,6 +3027,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get needsSync =>
+      $composableBuilder(column: $table.needsSync, builder: (column) => column);
 
   GeneratedColumn<String> get timezone =>
       $composableBuilder(column: $table.timezone, builder: (column) => column);
@@ -2679,6 +3098,7 @@ class $$SettingsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
                 Value<String> timezone = const Value.absent(),
                 Value<int> sleepGoalMinutes = const Value.absent(),
                 Value<int> bedtime = const Value.absent(),
@@ -2692,6 +3112,7 @@ class $$SettingsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                needsSync: needsSync,
                 timezone: timezone,
                 sleepGoalMinutes: sleepGoalMinutes,
                 bedtime: bedtime,
@@ -2707,6 +3128,7 @@ class $$SettingsTableTableManager
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<bool> needsSync = const Value.absent(),
                 Value<String> timezone = const Value.absent(),
                 Value<int> sleepGoalMinutes = const Value.absent(),
                 Value<int> bedtime = const Value.absent(),
@@ -2720,6 +3142,7 @@ class $$SettingsTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                needsSync: needsSync,
                 timezone: timezone,
                 sleepGoalMinutes: sleepGoalMinutes,
                 bedtime: bedtime,
@@ -2763,6 +3186,151 @@ typedef $$SettingsTableProcessedTableManager =
       UserSettings,
       PrefetchHooks Function()
     >;
+typedef $$SyncStateTableCreateCompanionBuilder = SyncStateCompanion Function({
+  required String name,
+  required String value,
+  Value<int> rowid,
+});
+typedef $$SyncStateTableUpdateCompanionBuilder = SyncStateCompanion Function({
+  Value<String> name,
+  Value<String> value,
+  Value<int> rowid,
+});
+
+class $$SyncStateTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncStateTable> {
+  $$SyncStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncStateTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncStateTable> {
+  $$SyncStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncStateTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncStateTable> {
+  $$SyncStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+}
+
+class $$SyncStateTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncStateTable,
+          SyncStateData,
+          $$SyncStateTableFilterComposer,
+          $$SyncStateTableOrderingComposer,
+          $$SyncStateTableAnnotationComposer,
+          $$SyncStateTableCreateCompanionBuilder,
+          $$SyncStateTableUpdateCompanionBuilder,
+          (
+            SyncStateData,
+            BaseReferences<_$AppDatabase, $SyncStateTable, SyncStateData>,
+          ),
+          SyncStateData,
+          PrefetchHooks Function()
+        > {
+  $$SyncStateTableTableManager(_$AppDatabase db, $SyncStateTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> name = const Value.absent(),
+            Value<String> value = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) => SyncStateCompanion(name: name, value: value, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String name,
+                required String value,
+                Value<int> rowid = const Value.absent(),
+              }) => SyncStateCompanion.insert(
+                name: name,
+                value: value,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SyncStateTable, SyncStateData>(table),
+                  BaseReferences<_$AppDatabase, $SyncStateTable, SyncStateData>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncStateTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncStateTable,
+      SyncStateData,
+      $$SyncStateTableFilterComposer,
+      $$SyncStateTableOrderingComposer,
+      $$SyncStateTableAnnotationComposer,
+      $$SyncStateTableCreateCompanionBuilder,
+      $$SyncStateTableUpdateCompanionBuilder,
+      (
+        SyncStateData,
+        BaseReferences<_$AppDatabase, $SyncStateTable, SyncStateData>,
+      ),
+      SyncStateData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2773,4 +3341,6 @@ class $AppDatabaseManager {
       $$DailyCheckinsTableTableManager(_db, _db.dailyCheckins);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
+  $$SyncStateTableTableManager get syncState =>
+      $$SyncStateTableTableManager(_db, _db.syncState);
 }

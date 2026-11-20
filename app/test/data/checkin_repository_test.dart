@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life_tracker/data/local/app_database.dart';
+import 'package:life_tracker/data/remote/checkin_dto.dart';
 import 'package:life_tracker/data/repositories/checkin_repository.dart';
 
 void main() {
@@ -14,6 +15,24 @@ void main() {
     repo = CheckinRepository(db, now: () => clock);
   });
   tearDown(() => db.close());
+
+  CheckinDto remote({
+    String id = 'server-id',
+    String date = '2026-11-06',
+    int mood = 3,
+    required DateTime updatedAt,
+  }) =>
+      CheckinDto(
+        id: id,
+        date: date,
+        mood: mood,
+        energy: 3,
+        productivity: 3,
+        note: null,
+        createdAt: updatedAt,
+        updatedAt: updatedAt,
+        deletedAt: null,
+      );
 
   test('creates a check-in for a new date', () async {
     await repo.saveForDate(
@@ -65,5 +84,76 @@ void main() {
     expect(recent, hasLength(7));
     expect(recent.first.date, '2026-11-09');
     expect(recent.last.date, '2026-11-03');
+  });
+
+  test('saving marks the check-in as pending sync', () async {
+    await repo.saveForDate(
+      date: '2026-11-06', mood: 7, energy: 5, productivity: 8,
+    );
+
+    final pending = await repo.pendingSync();
+    expect(pending.single.needsSync, isTrue);
+  });
+
+  test('markSynced clears the flag', () async {
+    await repo.saveForDate(
+      date: '2026-11-06', mood: 7, energy: 5, productivity: 8,
+    );
+
+    await repo.markSynced(await repo.pendingSync());
+
+    expect(await repo.pendingSync(), isEmpty);
+  });
+
+  test('a row edited during the push stays pending', () async {
+    await repo.saveForDate(
+      date: '2026-11-06', mood: 7, energy: 5, productivity: 8,
+    );
+    final pushed = await repo.pendingSync();
+
+    clock = clock.add(const Duration(minutes: 1));
+    await repo.saveForDate(
+      date: '2026-11-06', mood: 2, energy: 5, productivity: 8,
+    );
+    await repo.markSynced(pushed);
+
+    expect((await repo.pendingSync()).single.mood, 2);
+  });
+
+  test('applyRemote inserts a server check-in as already synced', () async {
+    await repo.applyRemote([remote(updatedAt: clock)]);
+
+    final saved = await repo.getForDate('2026-11-06');
+    expect(saved!.id, 'server-id');
+    expect(saved.needsSync, isFalse);
+  });
+
+  test('applyRemote adopts the server id for the same date', () async {
+    await repo.saveForDate(
+      date: '2026-11-06', mood: 7, energy: 5, productivity: 8,
+    );
+
+    await repo.applyRemote(
+      [remote(mood: 4, updatedAt: clock.add(const Duration(hours: 1)))],
+    );
+
+    final rows = await db.select(db.dailyCheckins).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.id, 'server-id');
+    expect(rows.single.mood, 4);
+  });
+
+  test('applyRemote keeps a newer local edit that is not pushed yet', () async {
+    await repo.saveForDate(
+      date: '2026-11-06', mood: 7, energy: 5, productivity: 8,
+    );
+
+    await repo.applyRemote(
+      [remote(mood: 4, updatedAt: clock.subtract(const Duration(hours: 1)))],
+    );
+
+    final saved = await repo.getForDate('2026-11-06');
+    expect(saved!.mood, 7);
+    expect(saved.needsSync, isTrue);
   });
 }

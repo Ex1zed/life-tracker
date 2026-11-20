@@ -1,6 +1,5 @@
 // drift column checks reference their own getter by design; it never recurses at runtime.
 // ignore_for_file: recursive_getters
-
 import 'package:drift/drift.dart';
 
 enum SleepSource { health, manual }
@@ -16,6 +15,10 @@ mixin SyncColumns on Table {
 
   /// Soft delete: deletions are synced like any other change.
   DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  /// True while the row has local changes the server hasn't accepted yet.
+  /// Defaults to true, so rows that existed before sync get uploaded.
+  BoolColumn get needsSync => boolean().withDefault(const Constant(true))();
 }
 
 class SleepEntries extends Table with SyncColumns {
@@ -67,4 +70,14 @@ class Settings extends Table with SyncColumns {
 
   @override
   Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Small key-value store for sync bookkeeping, e.g. the pull cursor.
+/// Lives in the database, so signing out (clearAllData) wipes it too.
+class SyncState extends Table {
+  TextColumn get name => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {name};
 }

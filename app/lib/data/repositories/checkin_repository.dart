@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../local/app_database.dart';
+import '../remote/checkin_dto.dart';
 
 /// All reads and writes of daily check-ins go through here, never from the UI.
 class CheckinRepository {
@@ -61,6 +62,7 @@ class CheckinRepository {
                 note: Value(cleanNote),
                 createdAt: now,
                 updatedAt: now,
+                needsSync: const Value(true),
               ),
             );
       } else {
@@ -74,9 +76,63 @@ class CheckinRepository {
             note: Value(cleanNote),
             updatedAt: Value(now),
             deletedAt: const Value(null),
+            needsSync: const Value(true),
           ),
         );
       }
     });
   }
+
+  /// Rows with local changes the server doesn't have yet (deleted ones too).
+  Future<List<DailyCheckin>> pendingSync() =>
+      (_db.select(_db.dailyCheckins)..where((t) => t.needsSync)).get();
+
+  /// Clears the flag on rows the server accepted. A row edited again while
+  /// the push was in flight has a newer updatedAt and stays pending.
+  Future<void> markSynced(List<DailyCheckin> pushed) => _db.transaction(() async {
+        for (final row in pushed) {
+          await (_db.update(_db.dailyCheckins)
+                ..where(
+                  (t) => t.id.equals(row.id) & t.updatedAt.equals(row.updatedAt),
+                ))
+              .write(const DailyCheckinsCompanion(needsSync: Value(false)));
+        }
+      });
+
+  /// Saves check-ins downloaded from the server.
+  /// Matched by date: the server's row wins unless a newer local edit is waiting.
+  Future<void> applyRemote(List<CheckinDto> items) => _db.transaction(() async {
+        for (final remote in items) {
+          final local = await (_db.select(_db.dailyCheckins)
+                ..where((t) => t.date.equals(remote.date)))
+              .getSingleOrNull();
+
+          if (local != null &&
+              local.needsSync &&
+              local.updatedAt.isAfter(remote.updatedAt)) {
+            continue; // our newer edit will be pushed next time
+          }
+
+          final row = DailyCheckinsCompanion(
+            id: Value(remote.id), // adopt the server's id for this date
+            date: Value(remote.date),
+            mood: Value(remote.mood),
+            energy: Value(remote.energy),
+            productivity: Value(remote.productivity),
+            note: Value(remote.note),
+            createdAt: Value(remote.createdAt),
+            updatedAt: Value(remote.updatedAt),
+            deletedAt: Value(remote.deletedAt),
+            needsSync: const Value(false),
+          );
+
+          if (local == null) {
+            await _db.into(_db.dailyCheckins).insert(row);
+          } else {
+            await (_db.update(_db.dailyCheckins)
+                  ..where((t) => t.date.equals(remote.date)))
+                .write(row);
+          }
+        }
+      });
 }
