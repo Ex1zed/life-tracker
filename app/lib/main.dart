@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/app_shell.dart';
+import 'core/auth_gate.dart';
 
 void main() {
   // ProviderScope stores the state of all Riverpod providers in the app.
@@ -25,7 +25,7 @@ class LifeTrackerApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const AppShell(),
+      home: const AuthGate()
     );
   }
 }

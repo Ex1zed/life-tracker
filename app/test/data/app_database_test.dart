@@ -35,4 +35,11 @@ void main() {
       throwsA(isA<Exception>()),
     );
   });
+    test('clearAllData removes every row', () async {
+    await db.into(db.dailyCheckins).insert(checkin(mood: 7));
+
+    await db.clearAllData();
+
+    expect(await db.select(db.dailyCheckins).get(), isEmpty);
+  });
 }

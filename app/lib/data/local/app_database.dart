@@ -14,4 +14,11 @@ class AppDatabase extends _$AppDatabase {
   /// Bump on every schema change and add a migration step.
   @override
   int get schemaVersion => 1;
+
+  /// Deletes every row in every table, e.g. when the user signs out.
+  Future<void> clearAllData() => transaction(() async {
+        for (final table in allTables) {
+          await delete(table).go();
+        }
+      });
 }

@@ -5,6 +5,7 @@ import '../../core/dates.dart';
 import '../../data/local/app_database.dart';
 import '../../data/providers.dart';
 import 'checkin_providers.dart';
+import '../auth/auth_controller.dart';
 
 class CheckinScreen extends ConsumerStatefulWidget {
   const CheckinScreen({super.key});
@@ -72,7 +73,28 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Выйти из аккаунта?'),
+        content: const Text('Записи на этом устройстве будут удалены.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(authControllerProvider.notifier).signOut();
+    }
+  }
   @override
   void dispose() {
     _noteController.dispose();
@@ -85,7 +107,16 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Сегодня')),
+       appBar: AppBar(
+        title: const Text('Сегодня'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Выйти',
+            onPressed: _confirmSignOut,
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
