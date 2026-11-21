@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/dates.dart';
+import '../../core/theme.dart';
 import '../../data/local/app_database.dart';
 import '../../data/providers.dart';
 import '../settings/settings_screen.dart';
 import 'checkin_providers.dart';
+import 'score_row.dart';
+import 'week_chart.dart';
 
 class CheckinScreen extends ConsumerStatefulWidget {
   const CheckinScreen({super.key});
@@ -84,6 +87,43 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
     );
   }
 
+  /// Monday..Sunday of the current week. Today shows the form's live values,
+  /// so the chart reacts while the user is still picking scores.
+  List<WeekDayScores> _weekDays(List<DailyCheckin> recent) {
+    final now = DateTime.now();
+    final monday = startOfWeek(now);
+    final byDate = {for (final c in recent) c.date: c};
+
+    return [
+      for (var i = 0; i < 7; i++)
+        _dayScores(
+          DateTime(monday.year, monday.month, monday.day + i),
+          byDate,
+        ),
+    ];
+  }
+
+  WeekDayScores _dayScores(DateTime day, Map<String, DailyCheckin> byDate) {
+    final key = toDateKey(day);
+    if (key == _todayKey) {
+      return WeekDayScores(
+        label: shortWeekday(day),
+        isToday: true,
+        mood: _mood,
+        energy: _energy,
+        productivity: _productivity,
+      );
+    }
+    final checkin = byDate[key];
+    return WeekDayScores(
+      label: shortWeekday(day),
+      isToday: false,
+      mood: checkin?.mood,
+      energy: checkin?.energy,
+      productivity: checkin?.productivity,
+    );
+  }
+
   @override
   void dispose() {
     _noteController.dispose();
@@ -92,141 +132,139 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final recent = ref.watch(recentCheckinsProvider);
-    final textTheme = Theme.of(context).textTheme;
+    final colors = AppColors.of(context);
+    // Recent check-ins feed the week chart; while loading, it's just empty.
+    final recent =
+        ref.watch(recentCheckinsProvider).value ?? const <DailyCheckin>[];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Сегодня'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Настройки',
-            onPressed: _openSettings,
-          ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text('Как прошёл день?', style: textTheme.titleLarge),
-                const SizedBox(height: 16),
-                _ScoreSlider(
-                  label: 'Настроение',
-                  value: _mood,
-                  onChanged: (v) => setState(() => _mood = v),
-                ),
-                _ScoreSlider(
-                  label: 'Энергия',
-                  value: _energy,
-                  onChanged: (v) => setState(() => _energy = v),
-                ),
-                _ScoreSlider(
-                  label: 'Продуктивность',
-                  value: _productivity,
-                  onChanged: (v) => setState(() => _productivity = v),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _noteController,
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Заметка (необязательно)',
-                    border: OutlineInputBorder(),
+      body: SafeArea(
+        bottom: false, // the navigation bar below handles the bottom inset
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                children: [
+                  _Header(
+                    date: formatLongDate(DateTime.now()),
+                    onSettings: _openSettings,
                   ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: Text(_hasToday ? 'Обновить чек-ин' : 'Сохранить чек-ин'),
-                ),
-                const SizedBox(height: 32),
-                Text('Последние 7 дней', style: textTheme.titleMedium),
-                const SizedBox(height: 8),
-                recent.when(
-                  data: (items) => items.isEmpty
-                      ? const Text('Пока нет чек-инов — сделай первый.')
-                      : Column(
-                          children: [
-                            for (final c in items)
-                              _CheckinTile(
-                                checkin: c,
-                                isToday: c.date == _todayKey,
-                              ),
-                          ],
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child: Column(
+                        children: [
+                          ScoreRow(
+                            label: 'Настроение',
+                            value: _mood,
+                            color: colors.mood,
+                            onChanged: (v) => setState(() => _mood = v),
+                          ),
+                          const Divider(),
+                          ScoreRow(
+                            label: 'Энергия',
+                            value: _energy,
+                            color: colors.energy,
+                            onChanged: (v) => setState(() => _energy = v),
+                          ),
+                          const Divider(),
+                          ScoreRow(
+                            label: 'Продуктивность',
+                            value: _productivity,
+                            color: colors.productivity,
+                            onChanged: (v) =>
+                                setState(() => _productivity = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _noteController,
+                          minLines: 1,
+                          maxLines: 3,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            hintText: 'Пара слов о дне…',
+                          ),
                         ),
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Ошибка загрузки: $e'),
-                ),
-              ],
-            ),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: Text(_hasToday ? 'Обновить' : 'Готово'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  WeekChart(days: _weekDays(recent)),
+                ],
+              ),
+      ),
     );
   }
 }
 
-/// Label, current value and a 1..10 slider.
-class _ScoreSlider extends StatelessWidget {
-  const _ScoreSlider({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
+/// Date, title and the settings button.
+class _Header extends StatelessWidget {
+  const _Header({required this.date, required this.onSettings});
 
-  final String label;
-  final int value;
-  final ValueChanged<int> onChanged;
+  final String date;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
+    final colors = AppColors.of(context);
+
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(label, style: textTheme.titleSmall),
-            const Spacer(),
-            Text('$value', style: textTheme.titleMedium),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                date,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: colors.muted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Сегодня',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                ),
+              ),
+            ],
+          ),
         ),
-        Slider(
-          value: value.toDouble(),
-          min: 1,
-          max: 10,
-          divisions: 9, // 9 steps between 1 and 10 -> whole numbers only
-          label: '$value',
-          onChanged: (v) => onChanged(v.round()),
+        IconButton(
+          onPressed: onSettings,
+          tooltip: 'Настройки',
+          icon: const Icon(Icons.tune),
+          style: IconButton.styleFrom(
+            fixedSize: const Size(44, 44),
+            backgroundColor: colors.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
         ),
       ],
-    );
-  }
-}
-
-/// One row in the "last 7 days" list.
-class _CheckinTile extends StatelessWidget {
-  const _CheckinTile({required this.checkin, required this.isToday});
-
-  final DailyCheckin checkin;
-  final bool isToday;
-
-  @override
-  Widget build(BuildContext context) {
-    final date = DateTime.parse(checkin.date);
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(isToday ? 'Сегодня' : '$day.$month'),
-      subtitle: Text(
-        'Настроение ${checkin.mood} · Энергия ${checkin.energy} · '
-        'Продуктивность ${checkin.productivity}',
-      ),
-      trailing: checkin.note == null ? null : const Icon(Icons.notes_outlined),
     );
   }
 }
