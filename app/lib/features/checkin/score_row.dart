@@ -26,6 +26,9 @@ class ScoreRow extends StatelessWidget {
   final Color color;
   final ValueChanged<int> onChanged;
 
+  /// Wide enough for "10" plus a gap, so the label never moves or touches it.
+  static const _numberWidth = 56.0;
+
   /// Every way of changing the value goes through here:
   /// ignores repeats (a drag reports the same segment many times)
   /// and gives a light tap of haptic feedback on each real change.
@@ -47,7 +50,7 @@ class ScoreRow extends StatelessWidget {
           Row(
             children: [
               SizedBox(
-                width: 48,
+                width: _numberWidth,
                 child: Text(
                   '$value',
                   style: const TextStyle(

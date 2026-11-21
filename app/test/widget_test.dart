@@ -73,4 +73,16 @@ void main() {
     expect(find.text('Получить код'), findsOneWidget);
     expect(find.text('Сон'), findsNothing);
   });
+
+  testWidgets('login asks for an email before calling the server',
+      (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump();
+
+    await tester.tap(find.text('Получить код'));
+    await tester.pump();
+
+    expect(find.textContaining('Введи почту'), findsOneWidget);
+    expect(find.text('Введи код'), findsNothing); // still on the first step
+  });
 }
