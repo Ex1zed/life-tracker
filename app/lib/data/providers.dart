@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
 import 'local/app_database.dart';
+import 'local/app_preferences.dart';
 import 'notifications/reminder_scheduler.dart';
 import 'remote/sync_api.dart';
 import 'remote/token_storage.dart';
@@ -17,6 +18,11 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   ref.onDispose(db.close);
   return db;
 });
+
+/// Device-only settings (theme); replaced by the in-memory version in tests.
+final appPreferencesProvider = Provider<AppPreferences>(
+  (ref) => SharedAppPreferences(),
+);
 
 final checkinRepositoryProvider = Provider<CheckinRepository>(
   (ref) => CheckinRepository(ref.watch(appDatabaseProvider)),

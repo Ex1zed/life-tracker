@@ -5,6 +5,7 @@ import '../../data/local/app_database.dart';
 import '../../data/providers.dart';
 import '../auth/auth_controller.dart';
 import 'settings_providers.dart';
+import 'theme_controller.dart';
 
 /// "21:00" for 1260 minutes since midnight.
 String formatMinutes(int minutes) {
@@ -43,7 +44,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _changeEveningTime(UserSettings s) async {
-    final minutes = await _pickTime(s.eveningReminder ?? _defaultEveningReminder);
+    final minutes =
+        await _pickTime(s.eveningReminder ?? _defaultEveningReminder);
     if (minutes == null || !mounted) return;
     await ref.read(settingsRepositoryProvider).setEveningReminder(minutes);
   }
@@ -105,6 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final email = ref.watch(myEmailProvider);
+    final themeMode = ref.watch(themeModeProvider).value ?? ThemeMode.system;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -118,63 +121,112 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           final evening = s.eveningReminder;
 
           return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
             children: [
               const _SectionHeader('Аккаунт'),
-              ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(
-                  email.when(
-                    data: (value) => value ?? 'Почта не указана',
-                    error: (_, _) => 'Нет связи с сервером',
-                    loading: () => 'Загрузка…',
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const Icon(Icons.person_outline),
+                  title: Text(
+                    email.when(
+                      data: (value) => value ?? 'Почта не указана',
+                      error: (_, _) => 'Нет связи с сервером',
+                      loading: () => 'Загрузка…',
+                    ),
+                  ),
+                  subtitle: const Text('Вход по почте'),
+                ),
+              ),
+              const _SectionHeader('Оформление'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SegmentedButton<ThemeMode>(
+                    expandedInsets: EdgeInsets.zero, // stretch to card width
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        icon: Icon(Icons.brightness_auto_outlined),
+                        label: Text('Система'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('Светлая'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('Тёмная'),
+                      ),
+                    ],
+                    selected: {themeMode},
+                    onSelectionChanged: (selection) => ref
+                        .read(themeModeProvider.notifier)
+                        .setMode(selection.first),
                   ),
                 ),
-                subtitle: const Text('Вход по почте'),
               ),
               const _SectionHeader('Сон'),
-              ListTile(
-                leading: const Icon(Icons.bedtime_outlined),
-                title: const Text('Время отбоя'),
-                subtitle: Text(
-                  'Подготовка ко сну — с ${formatMinutes(windDownStart)}',
-                ),
-                trailing: Text(
-                  formatMinutes(s.bedtime),
-                  style: theme.textTheme.titleMedium,
-                ),
-                onTap: () => _changeBedtime(s),
-              ),
-              const _SectionHeader('Напоминания'),
-              SwitchListTile(
-                secondary: const Icon(Icons.notifications_outlined),
-                title: const Text('Вечерний чек-ин'),
-                subtitle: Text(
-                  evening == null
-                      ? 'Выключено'
-                      : 'Каждый день в ${formatMinutes(evening)}',
-                ),
-                value: evening != null,
-                onChanged: _toggleEvening,
-              ),
-              if (evening != null)
-                ListTile(
-                  leading: const SizedBox(width: 24), // align with the switch row
-                  title: const Text('Время напоминания'),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const Icon(Icons.bedtime_outlined),
+                  title: const Text('Время отбоя'),
+                  subtitle: Text(
+                    'Подготовка ко сну — с ${formatMinutes(windDownStart)}',
+                  ),
                   trailing: Text(
-                    formatMinutes(evening),
+                    formatMinutes(s.bedtime),
                     style: theme.textTheme.titleMedium,
                   ),
-                  onTap: () => _changeEveningTime(s),
+                  onTap: () => _changeBedtime(s),
                 ),
+              ),
+              const _SectionHeader('Напоминания'),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.notifications_outlined),
+                      title: const Text('Вечерний чек-ин'),
+                      subtitle: Text(
+                        evening == null
+                            ? 'Выключено'
+                            : 'Каждый день в ${formatMinutes(evening)}',
+                      ),
+                      value: evening != null,
+                      onChanged: _toggleEvening,
+                    ),
+                    if (evening != null) ...[
+                      const Divider(indent: 16, endIndent: 16),
+                      ListTile(
+                        leading: const SizedBox(width: 24), // align with icons
+                        title: const Text('Время напоминания'),
+                        trailing: Text(
+                          formatMinutes(evening),
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        onTap: () => _changeEveningTime(s),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
-              const Divider(),
-              ListTile(
-                leading: Icon(Icons.logout, color: theme.colorScheme.error),
-                title: Text(
-                  'Выйти из аккаунта',
-                  style: TextStyle(color: theme.colorScheme.error),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: Icon(Icons.logout, color: theme.colorScheme.error),
+                  title: Text(
+                    'Выйти из аккаунта',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  onTap: _confirmSignOut,
                 ),
-                onTap: _confirmSignOut,
               ),
             ],
           );
@@ -194,7 +246,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
       child: Text(
         title,
         style: theme.textTheme.labelLarge?.copyWith(

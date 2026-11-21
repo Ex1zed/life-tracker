@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life_tracker/data/local/app_database.dart';
+import 'package:life_tracker/data/local/app_preferences.dart';
 import 'package:life_tracker/data/notifications/reminder_scheduler.dart';
 import 'package:life_tracker/data/providers.dart';
 import 'package:life_tracker/data/remote/token_storage.dart';
@@ -38,6 +39,7 @@ void main() {
   ProviderScope app({String? token}) => ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWithValue(db),
+          appPreferencesProvider.overrideWithValue(InMemoryAppPreferences()),
           tokenStorageProvider.overrideWithValue(
             InMemoryTokenStorage()..token = token,
           ),
