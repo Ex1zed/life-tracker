@@ -6,7 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/dates.dart';
 import '../../data/local/app_database.dart';
 import '../../data/providers.dart';
-import '../auth/auth_controller.dart';
+import '../settings/settings_screen.dart';
 import 'checkin_providers.dart';
 
 class CheckinScreen extends ConsumerStatefulWidget {
@@ -78,47 +78,9 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
     }
   }
 
-  Future<void> _confirmSignOut() async {
-    final confirmed = await _ask(
-      title: 'Выйти из аккаунта?',
-      text: 'Записи отправятся на сервер и удалятся с этого устройства.',
-    );
-    if (confirmed != true || !mounted) return;
-
-    // Upload everything first: sign-out wipes the local database.
-    await ref.read(syncServiceProvider).syncNow();
-    final unsent = await ref.read(checkinRepositoryProvider).pendingSync();
-    if (!mounted) return;
-
-    if (unsent.isNotEmpty) {
-      final force = await _ask(
-        title: 'Не всё отправлено',
-        text: 'Нет связи с сервером. Неотправленные записи '
-            '(${unsent.length}) будут потеряны. Выйти всё равно?',
-      );
-      if (force != true || !mounted) return;
-    }
-
-    await ref.read(authControllerProvider.notifier).signOut();
-  }
-
-  Future<bool?> _ask({required String title, required String text}) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(text),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Выйти'),
-          ),
-        ],
-      ),
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
     );
   }
 
@@ -138,9 +100,9 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
         title: const Text('Сегодня'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Выйти',
-            onPressed: _confirmSignOut,
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Настройки',
+            onPressed: _openSettings,
           ),
         ],
       ),

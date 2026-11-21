@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
 import 'local/app_database.dart';
+import 'notifications/reminder_scheduler.dart';
 import 'remote/sync_api.dart';
 import 'remote/token_storage.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/checkin_repository.dart';
+import 'repositories/settings_repository.dart';
 import 'sync/sync_service.dart';
 
 /// One database instance for the whole app, closed when the app shuts down.
@@ -18,6 +20,15 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 
 final checkinRepositoryProvider = Provider<CheckinRepository>(
   (ref) => CheckinRepository(ref.watch(appDatabaseProvider)),
+);
+
+final settingsRepositoryProvider = Provider<SettingsRepository>(
+  (ref) => SettingsRepository(ref.watch(appDatabaseProvider)),
+);
+
+/// Local notifications; replaced by a fake in widget tests.
+final reminderSchedulerProvider = Provider<ReminderScheduler>(
+  (ref) => LocalReminderScheduler(),
 );
 
 final tokenStorageProvider = Provider<TokenStorage>(

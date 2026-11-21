@@ -17,9 +17,11 @@ class AuthController extends AsyncNotifier<bool> {
     state = const AsyncData(true);
   }
 
-  /// Removes the token and wipes local data, so the next user starts clean.
+  /// Removes the token, wipes local data and reminders,
+  /// so the next user starts clean.
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();
+    await ref.read(reminderSchedulerProvider).cancelAll();
     await ref.read(appDatabaseProvider).clearAllData();
     state = const AsyncData(false);
   }

@@ -2,16 +2,30 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life_tracker/data/local/app_database.dart';
+import 'package:life_tracker/data/notifications/reminder_scheduler.dart';
 import 'package:life_tracker/data/providers.dart';
 import 'package:life_tracker/data/remote/token_storage.dart';
 import 'package:life_tracker/data/sync/sync_service.dart';
 import 'package:life_tracker/features/checkin/checkin_providers.dart';
+import 'package:life_tracker/features/settings/settings_providers.dart';
 import 'package:life_tracker/main.dart';
 
 /// Sync that does nothing: widget tests have no server.
 class _NoSync implements SyncService {
   @override
   Future<bool> syncNow() async => true;
+}
+
+/// Reminders that do nothing: widget tests have no notification system.
+class _NoReminders implements ReminderScheduler {
+  @override
+  Stream<void> get taps => const Stream.empty();
+
+  @override
+  Future<void> scheduleEveningCheckin(int? minutes) async {}
+
+  @override
+  Future<void> cancelAll() async {}
 }
 
 void main() {
@@ -28,9 +42,13 @@ void main() {
             InMemoryTokenStorage()..token = token,
           ),
           syncServiceProvider.overrideWithValue(_NoSync()),
+          reminderSchedulerProvider.overrideWithValue(_NoReminders()),
+          // Drift watch() streams leave timers behind in widget tests,
+          // so streams are replaced with simple ones.
           recentCheckinsProvider.overrideWith(
             (ref) => Stream.value(const <DailyCheckin>[]),
           ),
+          settingsProvider.overrideWith((ref) => const Stream.empty()),
         ],
         child: const LifeTrackerApp(),
       );
